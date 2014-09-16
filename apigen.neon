@@ -1,0 +1,14 @@
+# This file provides the configuration necessary for
+# generating the Mango Documentation. In order to
+# generate the documentation you need to have apigen
+# installed, you can download it here http://apigen.org
+# Once you have it installed simply cd into the 'system'
+# directory and run 'apigen' from the console
+
+title: "Mango Framework 1.0"
+source: classes
+destination: docs
+main: M
+internal: no
+php: no
+deprecated: yes
