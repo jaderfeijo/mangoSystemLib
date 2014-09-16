@@ -46,7 +46,6 @@
 	 */
 	
 	require_once('errors.php');
-	require_once('packages.php');
 	
 	/******************** Boxing & Unboxing Strings ********************/
 	
