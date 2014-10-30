@@ -48,14 +48,14 @@ class MObject implements MMangoObject {
 	 *
 	 * @return MString
 	 */
-	public static function typeClass() : MString {
+	public static function className() : MString {
 		return S(get_called_class());
 	}
 	
 	/**
 	 * Creates a new instance of the class specified
 	 *
-	 * @example $mString = MObject::newInstanceOfClass(S("mango.system.MString"));
+	 * @example $mString = MObject::newInstanceOfClass(S("MString"));
 	 * // $mString is a new instance of MString
 	 *
 	 * @param MString $className The fully qualified class name you wish to create an instance of
@@ -78,7 +78,7 @@ class MObject implements MMangoObject {
 	 * @return object A new instance of the class specified by $className initialized with the
 	 * parameters specified by $params
 	 */
-	public static function newInstanceOfClassWithParameters(MString $className, ?MArray $params = null) : object {
+	public static function newInstanceOfClassWithParameters(MString $className, ?MArray<mixed> $params = null) : object {
 		$reflectionClass = MObject::reflectionClass($className);
 		if ($params !== null) {
 			return $reflectionClass->newInstanceArgs($params->toArray());
@@ -136,20 +136,12 @@ class MObject implements MMangoObject {
 		}
 	}
 	
-	public function hash() : string {
+	public function hash() : int {
 		return hexdec(md5(var_export($this, true)));
 	}
 	
 	public function className() : MString {
 		return S(get_class($this));
-	}
-	
-	public function packageName() : MString {
-		return S(__DIR__)->componentsSeparatedByString(S("/"))->lastObject();
-	}
-	
-	public function fullClassName() : MString {
-		return Sf("%s.%s", $this->packageName(), $this->className());
 	}
 	
 	public function isKindOfClass(MString $class) : bool {
@@ -160,13 +152,6 @@ class MObject implements MMangoObject {
 		return $this->className();
 	}
 	
-	/**
-	 * @internal
-	 *
-	 * Returns a string representation of the current object
-	 *
-	 * @return string A string representation of the current object
-	 */
 	public function __toString() : string {
 		return $this->toString()->stringValue();
 	}

@@ -28,17 +28,6 @@
  * SUCH DAMAGE.
  */
 
-enum MApplicationControllerAttributeType : int {
-	String = 0;
-	Integer = 1;
-	Float = 2;
-	Boolean = 3;
-	Date = 4;
-	Binary = 5;
-	Array = 6;
-	Directory = 7;
-}
-
 /**
  * Abstract class which forms the base for all application controller attributes
  *

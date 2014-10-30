@@ -1,4 +1,4 @@
-<?hh // strict
+<?hh
 
 /*
  * Copyright (c) 2011 Movinpixel Ltd. All rights reserved.
@@ -33,96 +33,108 @@
  *
  * @license MIT
  */
-class MSet extends MObject {
-	
-	const ObjectNotFound = -1;
+class MSet<T> extends MValue {
+
+	public static function withObjectsFromArray<Tv>(array $objects) : MSet<Tv> {
+		$set = new MMutableSet();
+		foreach ($objects as $object) {
+			$set->addObject($object);
+		}
+		return $set;
+	}
+
+	public static function withObjects<Tv>(Traversable<Tv> $objects) : MSet<Tv> {
+		$set = new MMutableSet();
+		foreach ($objects as $object) {
+			$set->addObject($object);
+		}
+		return $set;
+	}
 	
 	//
 	// ************************************************************
 	//
 	
-	protected array $_set;
+	protected Set<T> $_set;
 	
-	public function __construct(?MArray $array = null) {
+	public function __construct(?Traversable<T> $t = null) {
 		parent::__construct();
-		$this->_set = ($array !== null ? $array->toArray() : array());
-	}
-	
-	/******************** Protected ********************/
-	
-	protected function _indexOfObject(object $object) : int {
-		for ($i = 0; $i < $this->count(); $i++) {
-			$current = $this->_set[$i];
-			if ($object instanceof MObject && $current instanceof MObject) {
-				if ($object->equals($current)) {
-					return $i;
-				}
-			} else {
-				if ($current == $object) {
-					return $i;
-				}
+
+		$this->_set = new Set(null);
+
+		if ($t !== null) {
+			foreach ($t as $o) {
+				$this->_set->add($o);
 			}
 		}
-		return MSet::ObjectNotFound;
 	}
-	
+
 	/******************** Properties ********************/
-	
+
 	public function count() : int {
-		return count($this->_set);
+		return $this->_set->count();
 	}
-	
+
+	public function traversable() : Traversable<T> {
+		return $this->toSet();
+	}
+
 	/******************** Methods ********************/
 	
-	public function objectExists(object $object) : bool {
-		return ($this->_indexOfObject($object) != MSet::ObjectNotFound);
+	public function containsObject(T $object) : bool {
+		return $this->_set->contains($object);
 	}
-	
-	public function containsObject(object $object) : bool {
-		return $this->objectExists($object);
-	}
-	
-	public function member(object $object) : ?MObject {
-		$index = $this->_indexOfObject($object);
-		if ($index != MSet::ObjectNotFound) {
-			return $this->_set[$index];
-		} else {
-			return null;
+
+	public function anyObject() : T {
+		foreach ($this->_set as $o) {
+			return $o;
 		}
+		throw new MObjectNotFoundException();
 	}
-	
-	public function anyObject() : ?MObject {
-		if ($this->count() > 0) {
-			return $this->_set[0];
-		} else {
-			return null;
-		}
+
+	public function toArray() : MArray<T> {
+		return new MArray($this->toSet());
 	}
-	
-	public function sortedArray(MArrayOrder $order = MArrayOrder::Ascending, int $sortFlags = SORT_REGULAR) : MArray {
-		$sortedArray = $this->_set;
-		if ($order == MArrayOrder::Ascending) {
-			sort($sortedArray, $sortFlags);
-		} else {
-			rsort($sortedArray, $sortFlags);
-		}
-		return new MArray($sortedArray);
-	}
-	
-	public function toArray() : array {
+
+	public function toSet() : ConstSet<T> {
 		return $this->_set;
 	}
 	
 	/******************** MObject ********************/
 	
-	public function compare(MMangoObject $object) : MComparisonResult {
-		if ($this->count() < $object->count()) {
-			return MComparisonResult::Ascending;
-		} else if ($this->count() > $object->count()) {
-			return MComparisonResult::Descending;
+	public function equals(MMangoObject $object) : bool {
+		if ($object instanceof MSet) {
+			if ($this->count() == $object->count()) {
+				foreach ($this->traversable() as $v) {
+					if (!$object->containsObject($v)) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				return false;
+			}
 		} else {
-			return MComparisonResult::Same;
+			return false;
 		}
+	}
+
+	public function compare(MMangoObject $object) : MComparisonResult {
+		if ($object instanceof MSet) {
+			if ($this->count() < $object->count()) {
+				return MComparisonResult::Ascending;
+			} else if ($this->count() > $object->count()) {
+				return MComparisonResult::Descending;
+			} else {
+				return MComparisonResult::Same;
+			}
+		} else {
+			return MComparisonResult::Descending;
+		}
+	}
+
+	public function toString() : MString {
+		return Sf("MSet[%d]:\n%s", $this->count(), var_export($this->_set, true));
 	}
 	
 }

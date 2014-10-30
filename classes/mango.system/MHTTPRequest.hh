@@ -28,17 +28,6 @@
  * SUCH DAMAGE.
  */
 
-enum MHTTPRequestMethod : string {
-	OPTIONS = 'OPTIONS';
-	GET = 'GET';
-	HEAD = 'HEAD';
-	POST = 'POST';
-	PUT = 'PUT';
-	DELETE = 'DELETE';
-	TRACE = 'TRACE';
-	CONNECT = 'CONNECT';
-}
-
 /**
  * @author Jader Feijo <jader@movinpixel.com>
  *
@@ -50,8 +39,8 @@ class MHTTPRequest extends MObject {
 	
 	public static function request() : MHTTPRequest {
 		if (MHTTPRequest::$_request === null) {
-			if (isRunningInSimulatedRequestMode()) {
-				MHTTPRequest::$_request = new MHTTPRequest(simulatedRequestFileName(), simulatedRequestName());
+			if (MApp()->isRunningInSimulatedRequestMode()) {
+				MHTTPRequest::$_request = new MHTTPRequest(MApp()->simulatedRequestFile());
 			} else {
 				MHTTPRequest::$_request = new MHTTPRequest();
 			}
@@ -79,7 +68,7 @@ class MHTTPRequest extends MObject {
 	
 	protected string $_contentsFile;
 	
-	public function __construct(?string $simulatedRequestFile = null, ?string $simulatedRequestName = null) {
+	public function __construct(?MFile $simulatedRequestFile = null) {
 		parent::__construct();
 		
 		$this->_method = null;
@@ -93,24 +82,15 @@ class MHTTPRequest extends MObject {
 		$this->_baseUrl = null;
 		$this->_url = null;
 		
-		if ($simulatedRequestFile) {
-			if (file_exists($simulatedRequestFile)) {
-				$json = json_decode(file_get_contents($simulatedRequestFile), true);
-				if (!empty($simulatedRequestName)) {
-					$request = $json[$simulatedRequestName];
-					if (!empty($request)) {
-						$this->_server = array_merge($_SERVER, $json[$simulatedRequestName]['server']);
-						$this->_get = array_merge($_GET, $json[$simulatedRequestName]['get']);
-						$this->_post = array_merge($_POST, $json[$simulatedRequestName]['post']);
-						$this->_contentsFile = $json[$simulatedRequestName]['contents-file'];
-					} else {
-						throw new Exception(Sf("Could not find request named '%s' inside '%s'", $simulatedRequestName, $simulatedRequestFile));
-					}
-				} else {
-					throw new MException(S("You must specify a 'request_name'. Usage: hhvm -m index.php --simulated-request [json_request_file] [request_name]"));
-				}
+		if ($simulatedRequestFile !== null) {
+			if ($simulatedRequestFile->exists()) {
+				$json = json_decode($simulatedRequestFile->contents());
+				$this->_server = array_merge($_SERVER, $json['server']);
+				$this->_get = array_merge($_GET, $json['get']);
+				$this->_post = array_merge($_POST, $json['post']);
+				$this->_contentsFile = $json['contents-file'];
 			} else {
-				throw new MFileNotFoundException(S($simulatedRequestFile));
+				throw new MFileNotFoundException($simulatedRequestFile->path());
 			}
 		} else {
 			$this->_server = $_SERVER;

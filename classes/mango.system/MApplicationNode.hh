@@ -37,18 +37,17 @@
  */
 class MApplicationNode extends MObject {
 	
-	protected MString $_name;
+	protected ?MString $_name;
 	protected ?MApplicationNode $_parentNode;
-	protected MMutableArray $_childNodes;
+	protected MMutableArray<MApplicationNode> $_childNodes;
 	
 	/**
-	 * 
 	 * @return MApplicationNode
 	 */
 	public function __construct(?MString $name = null) {
 		parent::__construct();
 		
-		$this->_name = ($name !== null ? $name : S(""));
+		$this->_name = $name;
 		$this->_parentNode = null;
 		$this->_childNodes = new MMutableArray();
 	}
@@ -56,9 +55,9 @@ class MApplicationNode extends MObject {
 	/******************** Properties ********************/
 	
 	/**
-	 * @return MString
+	 * @return ?MString
 	 */
-	public function name() : MString {
+	public function name() : ?MString {
 		return $this->_name;
 	}
 	
@@ -115,7 +114,7 @@ class MApplicationNode extends MObject {
 	 * @return MApplicationNode
 	 */
 	public function childNodeWithName(MString $name) : ?MApplicationNode {
-		foreach ($this->childNodes()->toArray() as $node) {
+		foreach ($this->childNodes()->traversable() as $node) {
 			if ($node->name()->equals($name)) {
 				return $node;
 			}
@@ -133,7 +132,7 @@ class MApplicationNode extends MObject {
 	/**
 	 * @return MViewController
 	 */
-	public function viewControllerForPath(MArray $path) : ?MViewController {
+	public function viewControllerForPath(MArray<MString> $path) : ?MViewController {
 		return null;
 	}
 	

@@ -29,26 +29,23 @@
  */
 	
 /**
- * 
- *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
-*/
+ */
 class MApplicationNamespace extends MApplicationNode {
-	
+
 	/**
-	 *
 	 * @param $namespaceElement
 	 *
 	 * @return MApplicationNamespace
 	 */
-	public static function parseFromXMLElement(SimpleXMLElement $namespaceElement, ?MString $name = null) {
-		$namespaceName = $name;
-		if ($namespaceName === null) {
-			$namespaceName = S($namespaceElement['name']);
-		}
-		$namespace = new MApplicationNamespace($namespaceName);
+	public static function parseFromXMLElement(SimpleXMLElement $namespaceElement) : MApplicationNamespace {
+		$namespace = MInitWith($namespaceElement['name'], $namespaceName ==> {
+			return new MApplicationNamespace(S($namespaceName));
+		}, () ==> {
+			return new MApplicationNamespace(S(""));
+		});
 		
 		foreach ($namespaceElement as $element) {
 			if ($element->getName() == "controller") {
@@ -71,21 +68,15 @@ class MApplicationNamespace extends MApplicationNode {
 	 * @return MApplicationNamespace
 	 */
 	public function __construct(MString $name) {
-		if (!$name->isEmpty()) {
-			parent::__construct($name);
-		} else {
-			throw new MInvalidOperationException(S("Cannot instantiate a namespace with an empty name"));
-		}
+		parent::__construct($name);
 	}
 	
 	/******************** MApplicationNode ********************/
 	
 	/**
-	 *
-	 *
 	 * @return MViewController
 	 */
-	public function viewControllerForPath(MArray $path) : MViewController {
+	public function viewControllerForPath(MArray<MString> $path) : ?MViewController {
 		$viewController = null;
 		
 		$name = S("");
@@ -98,12 +89,13 @@ class MApplicationNamespace extends MApplicationNode {
 			$subpath = $path->subarrayFromIndex(1);
 		}
 		
-		$node = $this->childNodeWithName($name);
-		if ($node) {
-			$viewController = $node->viewControllerForPath($subpath);
-		}
-		
-		if ($viewController) {
+		$viewController = MInitWith($this->childNodeWithName($name), $node ==> {
+			return $node->viewControllerForPath($subpath);
+		}, () ==> {
+			return null;
+		});
+
+		if ($viewController !== null) {
 			return $viewController;
 		} else {
 			return parent::viewControllerForPath($path);

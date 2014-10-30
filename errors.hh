@@ -34,7 +34,6 @@
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
- *
  */
 
 /******************** Internal Stuff ********************/
@@ -45,6 +44,8 @@ set_exception_handler("mango_exception_handler");
 /**
  * @internal
  * 
+ * @todo update
+ *
  * Mango Framework error handler
  * 
  * The Mango Framework error handler. This function is called by PHP and
@@ -62,19 +63,11 @@ set_exception_handler("mango_exception_handler");
  * not the error has been handled, if this function returns false, PHP
  * handles the error with it's default error handler
  */
-function mango_error_handler($level, $message, $file, $line, $context) : bool {
+function mango_error_handler(int $level, string $message, int $file, string $line, string $context) : bool {
 	if ($level == E_ERROR || $level == E_PARSE || $level == E_CORE_ERROR || $level == E_COMPILE_ERROR || $level == E_USER_ERROR) {
-		if (!MAppDelegate()->didRecoverFromError($level, $message, $file, $line, $context)) {
-			logError($level, $message, $file, $line);
-	
-			if (!isRunningFromCommandLine() || isRunningInSimulatedRequestMode()) {
-				$response = new MHTTPViewControllerResponse(new MErrorViewController(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR, N(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR), S("Internal Server Error"), S("Sorry but the page you are looking for could not be loaded due to an internal server error")));
-				$response->setCode(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR);
-				MDie($response);
-			} else {
-				MDie(null, 1);
-			}
-		}
+		logError($level, $message, $file, $line);
+		http_response_code(500);
+		die(1);
 	}
 	return true;
 }
@@ -91,18 +84,10 @@ function mango_error_handler($level, $message, $file, $line, $context) : bool {
  *
  * @return void
  */
-function mango_exception_handler($exception) : void {
-	if (!MAppDelegate()->didRecoverFromUncaughtException($exception)) {
-		logException($exception);
-
-		if (!isRunningFromCommandLine() || isRunningInSimulatedRequestMode()) {
-			$response = new MHTTPViewControllerResponse(new MErrorViewController(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR, N(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR), S("Internal Server Error"), S("Sorry but the page you are looking for could not be loaded due to an internal server error")));
-			$response->setCode(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR);
-			MDie($response);
-		} else {
-			MDie(null, 1);
-		}
-	}
+function mango_exception_handler(Exception $exception) : void {
+	logException($exception);
+	http_response_code(500);
+	die(1);
 }
 
 /**
@@ -110,9 +95,9 @@ function mango_exception_handler($exception) : void {
  *
  * @return array
  */
-function backTrace($useBackTrace = null) : array {
+function backTrace(array $useBackTrace = null) : array {
 	$backTrace = $useBackTrace;
-	if (is_null($backTrace)) {
+	if ($backTrace === null) {
 		$backTrace = debug_backtrace();
 	}
 
@@ -149,7 +134,7 @@ function backTrace($useBackTrace = null) : array {
  *
  * @return string
  */
-function backTraceString($backTrace = null) : string {
+function backTraceString(array $backTrace = null) : string {
 	return implode("\n", backTrace($backTrace));
 }
 
@@ -158,7 +143,7 @@ function backTraceString($backTrace = null) : string {
  *
  * @return void
  */
-function logBackTrace($backTrace = null) : void {
+function logBackTrace(array $backTrace = null) : void {
 	$backTrace = backTrace($backTrace);
 	error_log("Mango Stack trace:");
 	foreach ($backTrace as $backString) {
@@ -171,7 +156,7 @@ function logBackTrace($backTrace = null) : void {
  *
  * @return void
  */
-function logError($level, $message, $file = null, $line = null, $backTrace = null) : void {
+function logError(int $level, string $message, ?string $file = null, ?int $line = null, ?array $backTrace = null) : void {
 	$errType = "Unknown Error:";
 	if ($level == E_ERROR) {
 		$errType = "Error:";
@@ -199,11 +184,11 @@ function logError($level, $message, $file = null, $line = null, $backTrace = nul
 
 	$logString = "$errType $message";
 
-	if (!is_null($file)) {
+	if ($file !== null) {
 		$logString .= " in $file";
 	}
 
-	if (!is_null($line)) {
+	if ($line !== null) {
 		$logString .= " on line $line";
 	}
 
@@ -220,7 +205,7 @@ function logError($level, $message, $file = null, $line = null, $backTrace = nul
  *
  * @return void
  */
-function issueWarning($message) : void {
+function issueWarning(string $message) : void {
 	logError(E_USER_WARNING, $message);
 }
 

@@ -1,4 +1,4 @@
-<?hh // strict
+<?hh
 
 /*
  * Copyright (c) 2011 Movinpixel Ltd. All rights reserved.
@@ -34,18 +34,19 @@
  * several different aspects of your Mango Application
  *
  * You should only ever create one instance of this class, this is usually done
- * in the index.php file. To access the MApplication singleton instance that
+ * in the `index.hh` file. To access the MApplication singleton instance that
  * represents the currently running Application use
  * MApplication::sharedApplication()
  *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
- *
  */
 class MApplication extends MObject {
-	
-	protected static MApplication $_application;
+
+	const string DefaultErrorViewControllerClass = "MErrorViewController";
+
+	protected static ?MApplication $_sharedApplication = null;
 	
 	/**
 	 * Returns the MApplication instance that represents the currently
@@ -54,72 +55,60 @@ class MApplication extends MObject {
 	 * @return MApplication The currently running Application instance
 	 */
 	public static function sharedApplication() : MApplication {
-		if (MApplication::$_application === null) {
-			MApplication::$_application = new MApplication();
+		if (MApplication::$_sharedApplication === null) {
+			throw new MException(S("No Application instance was created!"));
 		}
-		return MApplication::$_application;
+		return MApplication::$_sharedApplication;
 	}
 	
 	//
 	// ************************************************************
 	//
-	
-	protected ?MApplicationDelegate $_delegate;
-	protected ?MString $_errorViewControllerClass;
-	protected ?MApplicationNamespace $_defaultNamespace;
+
+	protected MApplicationDelegate $_delegate;
+	protected MApplicationNamespace $_defaultNamespace;
+	protected MArray<MString> $_arguments;
+
+	protected MString $_errorViewControllerClass;
 	protected ?MViewController $_rootViewController;
-	protected ?MString $_commandName;
-	protected ?MArray $_commandLineArguments;
+	protected ?MFile $_simulatedRequestFile;
 
 	/**
 	 * Creates a new MApplication instance with the specified delegate class
 	 * If no delegate class is specified the system looks for the 'manifest.xml'
 	 * file inside the 'resources' folder and parses it
 	 *
-	 * @param MString $delegateClass A string containing the fully qualified class
-	 * name for this application's delegate, or null.
+	 * @todo Describe parameters
 	 *
 	 * @return MApplication The MApplication instance which has just been created
 	 */
-	public function __construct(MString $delegateClass = null) {
+	public function __construct(MApplicationDelegate $delegate, MApplicationNamespace $defaultNamespace, MArray<MString> $arguments) {
 		parent::__construct();
-
-		$this->_delegate = null;
-		$this->_errorViewControllerClass = null;
-		$this->_defaultNamespace = null;
+		
+		$this->_delegate = $delegate; 
+		$this->_defaultNamespace = $defaultNamespace;
+		$this->_arguments = $arguments;
+		
+		$this->_errorViewControllerClass = S(MApplication::DefaultErrorViewControllerClass);
 		$this->_rootViewController = null;
-		$this->_commandName = null;
-		$this->_commandLineArguments = null;
+		$this->_simulatedRequestFile = null;
+		
+		if (MApplication::$_sharedApplication === null) {
+			MApplication::$_sharedApplication = $this;
+		} else {
+			throw new MApplicationInstanceAlreadyCreatedException();
+		}
 		
 		if (!$this->isRoutingEnabled()) {
 			$this->enableRouting();
-			
-			$redirect = new MHTTPResponse(MHTTPResponse::RESPONSE_FOUND);
-			$redirect->addHeader(S("Location"), MHTTPRequest()->url());
-			
-			MDie($redirect);
-		}
-		
-		if ($delegateClass) {
-			$this->_delegate = MObject::newInstanceOfClass($delegateClass);
-		} else {
-			if (MFile::fileExists("resources/manifest.xml")) {
-				$xmlManifest = simplexml_load_file("resources/manifest.xml");
-				$this->_delegate = MObject::newInstanceOfClassWithParameters(S($xmlManifest['delegate']), A($this));
-				$this->_errorViewControllerClass = S($xmlManifest['errorClass']);
-				try {
-					$this->_defaultNamespace = MApplicationNamespace::parseFromXMLElement($xmlManifest, S("application"));
-				} catch (Exception $e) {
-					throw new MParseErrorException(S("resources/manifest.xml"), null, null, $e);
-				}
-			} else {
-				throw new MFileNotFoundException(S('resources/manifest.xml'));
+			if (!$this->isRunningFromCommandLine()) {
+				$redirect = new MHTTPResponse(MHTTPResponseCode::Found);
+				$redirect->addHeader(S("Location"), MHTTPRequest()->url());
+				MDie($redirect);
 			}
 		}
-
-		MApplication::$_application = $this;
 	}
-	
+
 	/******************** Protected ********************/
 	
 	/**
@@ -141,7 +130,7 @@ class MApplication extends MObject {
 	 */
 	protected function enableRouting() : void {
 		MLog("[EnableRouting]: Creating '.htaccess' file for URL routing…");
-	
+		
 		$fileStream = new MFileOutputStream(new MFile(S(".htaccess")));
 		$writer = new MStreamWriter($fileStream);
 		$writer->writeLine(S("# Mango URL Routing Code"));
@@ -150,28 +139,6 @@ class MApplication extends MObject {
 		$writer->close();
 		
 		MLog("[EnableRouting]: File created");
-	}
-	
-	/**
-	 * @internal
-	 *
-	 * @return void
-	 */
-	protected function parseCommandLineArguments() : void {
-		global $argv;
-		if ($this->isRunningFromCommandLine()) {
-			$command = null;
-			$arguments = new MMutableArray();
-			foreach ($argv as $argument) {
-				if (is_null($command)) {
-					$command = S($argument);
-				} else {
-					$arguments->addObject(S($argument));
-				}
-			}
-			$this->_commandName = $command;
-			$this->_commandLineArguments = $arguments;
-		}
 	}
 	
 	/******************** Properties ********************/
@@ -187,6 +154,29 @@ class MApplication extends MObject {
 	}
 	
 	/**
+	 * Returns the default namespace for this application.
+	 *
+	 * @return MApplicationNamespace The default namespace used by this application
+	 */
+	public function defaultNamespace() : MApplicationNamespace {
+		if (!$this->_defaultNamespace) {
+			$this->_defaultNamespace = new MApplicationNamespace(S(""));
+		}
+		return $this->_defaultNamespace;
+	}
+
+	/**
+	 * Returns an array containing all the arguments that were passed to this mango
+	 * application when it was invoked from the command line.
+	 *
+	 * @return MArray<MString> An array containing the arguments that were passed in from the
+	 * command line.
+	 */
+	public function arguments() : MArray<MString> {
+		return $this->_arguments;
+	}
+	
+	/**
 	 * Sets the MErrorViewController subclass this application should use for handling
 	 * errors
 	 *
@@ -195,12 +185,12 @@ class MApplication extends MObject {
 	 * If this value is set to null or an empty string, the application will use the
 	 * system's default error view controller
 	 *
-	 * @param MString $errorViewControllerClass The fully qualified class name to use
-	 * for error handling
+	 * @param MString $errorViewControllerClass The class name of the view controller
+	 * to use for error handling
 	 *
 	 * @return void
 	 */
-	public function setErrorViewControllerClass(MString $errorViewControllerClass = null) : void {
+	public function setErrorViewControllerClass(MString $errorViewControllerClass) : void {
 		$this->_errorViewControllerClass = $errorViewControllerClass;
 	}
 	
@@ -212,24 +202,7 @@ class MApplication extends MObject {
 	 * class name
 	 */
 	public function errorViewControllerClass() : MString {
-		if ($this->_errorViewControllerClass) {
-			if (!$this->_errorViewControllerClass->isEmpty()) {
-				return $this->_errorViewControllerClass;
-			}
-		}
-		return S("mango.system.MErrorViewController");
-	}
-	
-	/**
-	 * Returns the default namespace for this application.
-	 *
-	 * @return MApplicationNamespace The default namespace used by this application
-	 */
-	public function defaultNamespace() : MApplicationNamespace {
-		if (!$this->_defaultNamespace) {
-			$this->_defaultNamespace = new MApplicationNamespace(S(""));
-		}
-		return $this->_defaultNamespace;
+		return $this->_errorViewControllerClass;
 	}
 	
 	/**
@@ -240,17 +213,15 @@ class MApplication extends MObject {
 	 * be instanced and called. The appropriate view controller is instanced according to
 	 * those parameters and returned by this method.
 	 *
-	 * @return MViewController The root view controller for this instance of the application
+	 * @return ?MViewController The root view controller for this instance of the application
 	 */
-	protected function rootViewController() : MViewController {
-		if (!$this->_rootViewController) {
+	public function rootViewController() : ?MViewController {
+		if ($this->_rootViewController === null) {
 			$this->_rootViewController = $this->defaultNamespace()->viewControllerForPath(MHTTPRequest()->arguments());
 		}
 		return $this->_rootViewController;
 	}
-	
-	/******************** Methods ********************/
-	
+
 	/**
 	 * Returns a boolean which indicates whether or not this application was called from
 	 * the command line, or whether it is being run as a result of a request to the
@@ -260,7 +231,7 @@ class MApplication extends MObject {
 	 * false otherwise.
 	 */
 	public function isRunningFromCommandLine() : bool {
-		if (isRunningFromCommandLine() && !isRunningInSimulatedRequestMode()) {
+		if (PHP_SAPI == 'cli') {
 			return true;
 		} else {
 			return false;
@@ -268,34 +239,63 @@ class MApplication extends MObject {
 	}
 	
 	/**
-	 * Returns a string containing the command name that was used to invoke this
-	 * application from the command line.
+	 * Returns whether or not this application is running in simulated request
+	 * mode. Simulated request mode allows the application to be called from
+	 * within the command line with a set of parameters which make it behave
+	 * as if it had received a normal HTTP request. This allows the application
+	 * to be debugged from the CLI without the need of having a HTTP server
+	 * in between.
 	 *
-	 * @return MString A string containing the command name used to invoke this
-	 * application from the command line.
+	 * Simulated request mode can be triggered using by passing the following
+	 * command when invoking the application's `index.hh` file.
+	 *
+	 * $ hhvm index.hh --simulate-request request.json
+	 *
+	 * This will look for a file named request.json, parse it's contents
+	 * and use it as a HTTP request which is passed to the application
+	 * and executed.
+	 *
+	 * You can also invoke the application with a given request in debug mode
+	 * as follows:
+	 *
+	 * $ hhvm -m debug index.hh --simulate-request request.json
+	 *
+	 * This will do the same as before, but will fire the HHVM debugger, allowing
+	 * you to debug the request, all done locally without the need for going through a
+	 * web server like Apache or Nginx.
+	 *
+	 * @return bool Whether or not this application is running in simulated request
+	 * mode.
 	 */
-	public function commandName() : MString {
-		if (!$this->_commandName) {
-			$this->parseCommandLineArguments();
-		}
-		return $this->_commandName;
+	public function isRunningInSimulatedRequestMode() : bool {
+		return ($this->simulatedRequestFile() !== null);
 	}
+
+	/**
+	 * Returns the path for the file containing the simulated request data
+	 * when running in simulated request mode, or null otherwise.
+	 *
+	 * @return ?MFile Returns the simulated request file if provided,
+	 * or null otherwise.
+	 */
+	public function simulatedRequestFile() : ?MFile {
+		if ($this->_simulatedRequestFile === null) {
+			if ($this->isRunningFromCommandLine()) {
+				$args = getopt('', 'simulate-request::');
+				$file = $args['simulate-request'];
+				if ($file !== null) {
+					$this->_simulatedRequestFile = new MFile(S($file));
+				}
+			}
+		}
+		return $this->_simulatedRequestFile;
+	}
+
+	/******************** Methods ********************/
 	
 	/**
-	 * Returns an array containing all the arguments that were passed to this mango
-	 * application when it was invoked from the command line.
+	 * @todo update
 	 *
-	 * @return MArray An array containing the arguments that were passed in from the
-	 * command line.
-	 */
-	public function commandLineArguments() : MArray {
-		if (!$this->_commandLineArguments) {
-			$this->parseCommandLineArguments();
-		}
-		return $this->_commandLineArguments;
-	}
-	
-	/**
 	 * This function needs to be called after creating your instance of MApplication.
 	 * This is the entry point for your application's execution
 	 *
@@ -314,14 +314,13 @@ class MApplication extends MObject {
 	 * appropriate error information to the error log and returns an 500 Internal Server
 	 * Error view to the client
 	 *
-	 * @return void
+	 * @return int
 	 */
-	public function run() : void {
-		$response = null;
+	public function run() : int {
 		$returnCode = 0;
 		
-		if ($this->isRunningFromCommandLine()) {
-			$returnCode = $this->delegate()->didFinishLaunchingFromCommandLineWithArguments($this->commandLineArguments());
+		if ($this->isRunningFromCommandLine() && !$this->isRunningInSimulatedRequestMode()) {
+			$returnCode = $this->delegate()->didFinishLaunchingFromCommandLineWithArguments($this->arguments());
 		} else {
 			$viewController = null;
 			
@@ -331,25 +330,26 @@ class MApplication extends MObject {
 			} catch (MBadRequestException $e) {
 				logException($e);
 				$viewController = MObject::newInstanceOfClassWithParameters($this->errorViewControllerClass(), A(
-					MHTTPResponse::RESPONSE_BAD_REQUEST, N(MHTTPResponse::RESPONSE_BAD_REQUEST), S("Bad Request"), $e->description()
+					MHTTPResponseCode::BadRequest, I((int)MHTTPResponseCode::BadRequest), S("Bad Request"), $e->description()
 				));
 			} catch (MException $e) {
 				logException($e);
 				$viewController = MObject::newInstanceOfClassWithParameters($this->errorViewControllerClass(), A(
-					MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR, N(MHTTPResponse::RESPONSE_INTERNAL_SERVER_ERROR), S("Internal Server Error"), S("Sorry but the page you are looking for could not be loaded due to an internal server error")
+					MHTTPResponseCode::InternalServerError, I((int)MHTTPResponseCode::InternalServerError), S("Internal Server Error"), S("Sorry but the page you are looking for could not be loaded due to an internal server error")
 				));
 			}
 			
-			if (!$viewController) {
+			if ($viewController === null) {
 				$viewController = MObject::newInstanceOfClassWithParameters($this->errorViewControllerClass(), A(
-					MHTTPResponse::RESPONSE_NOT_FOUND, N(MHTTPResponse::RESPONSE_NOT_FOUND), S("Not Found"), S("Sorry but the page you are looking for could not be found")
+					MHTTPResponseCode::NotFound, I((int)MHTTPResponseCode::NotFound), S("Not Found"), S("Sorry but the page you are looking for could not be found")
 				));
 			}
 			
 			$response = new MHTTPViewControllerResponse($viewController);
+			MSendResponse($response);
 		}
-		
-		MDie($response, $returnCode);
+
+		return $returnCode;
 	}
 
 }

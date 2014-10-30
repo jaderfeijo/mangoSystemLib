@@ -44,12 +44,11 @@
 class MApplicationController extends MApplicationNode {
 	
 	/**
-	 *
 	 * @param $controllerElement
 	 *
 	 * @return MApplicationController
 	 */
-	public function parseFromXMLElement($controllerElement) : MApplicationController {
+	public function parseFromXMLElement(SimpleXMLElement $controllerElement) : MApplicationController {
 		$controller = new MApplicationController(S($controllerElement['class']), S($controllerElement['name']));
 		
 		foreach ($controllerElement as $attributeElement) {
@@ -97,21 +96,21 @@ class MApplicationController extends MApplicationNode {
 							}
 							
 							if ($fieldElement['type'] == "String") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::StringType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::String, $required));
 							} else if ($fieldElement['type'] == "Integer") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::IntegerType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Integer, $required));
 							} else if ($fieldElement['type'] == "Float") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::FloatType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Float, $required));
 							} else if ($fieldElement['type'] == "Boolean") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::BooleanType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Boolean, $required));
 							} else if ($fieldElement['type'] == "Date") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::DateType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Date, $required));
 							} else if ($fieldElement['type'] == "Binary") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::BinaryType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Binary, $required));
 							} else if ($fieldElement['type'] == "Array") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::ArrayType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Array, $required));
 							} else if ($fieldElement['type'] == "Dictionary") {
-								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerField::DictionaryType, $required));
+								$acceptedMethod->addField(new MApplicationControllerField(S($fieldElement['name']), MApplicationControllerAttributeType::Dictionary, $required));
 							} else {
 								throw new MParseErrorException(null, null, Sf("Unknown type '%s'", $fieldElement['type']));
 							}
@@ -138,9 +137,8 @@ class MApplicationController extends MApplicationNode {
 	//
 	
 	protected MString $_controllerClassName;
-	protected MMutableArray $_parameters;
-	protected MMutableArray $_acceptedMethods;
-	protected MMutableArray $_parameterValues;
+	protected MMutableArray<MApplicationControllerParameter> $_parameters;
+	protected MMutableArray<MApplicationControllerAcceptedMethod> $_acceptedMethods;
 	
 	/**
 	 * Creates a new application controller instance with the specified view controller class name
@@ -158,7 +156,6 @@ class MApplicationController extends MApplicationNode {
 		$this->_controllerClassName = $controllerClassName;
 		$this->_parameters = new MMutableArray();
 		$this->_acceptedMethods = new MMutableArray();
-		$this->_parameterValues = new MMutableArray();
 	}
 	
 	/******************** Properties ********************/
@@ -180,8 +177,8 @@ class MApplicationController extends MApplicationNode {
 	 * @return MArray An array containing all accepted parameter objects for this
 	 * controller
 	 */
-	public function parameters() : MArray {
-		return (MArray)$this->_parameters;
+	public function parameters() : MArray<MApplicationControllerParameter> {
+		return $this->_parameters;
 	}
 	
 	/**
@@ -191,14 +188,14 @@ class MApplicationController extends MApplicationNode {
 	 * @return MArray An array containing all the required parameters for this
 	 * controller
 	 */
-	public function requiredParameters() : MArray {
+	public function requiredParameters() : MArray<MApplicationControllerParameter> {
 		$requiredParameters = new MMutableArray();
 		foreach ($this->parameters()->toArray() as $parameter) {
 			if ($parameter->required()) {
 				$requiredParameters->addObject($parameter);
 			}
 		}
-		return (MArray)$requiredParameters;
+		return $requiredParameters;
 	}
 	
 	/**
@@ -207,19 +204,8 @@ class MApplicationController extends MApplicationNode {
 	 *
 	 * @return MArray An array containing all accepted methods for this controller
 	 */
-	public function acceptedMethods() : MArray {
+	public function acceptedMethods() : MArray<MApplicationControllerAcceptedMethod> {
 		return $this->_acceptedMethods;
-	}
-	
-	/**
-	 * Returns an array of the consumed parameter values for this view controller.
-	 * The values are passed in via the consumeParameterValues() method.
-	 *
-	 * @return MArray An array contining all the parameter values which
-	 * were consumed by this controller
-	 */
-	public function parameterValues() : MArray {
-		return $this->_parameterValues;
 	}
 	
 	/******************** Methods ********************/
@@ -364,13 +350,13 @@ class MApplicationController extends MApplicationNode {
 	 * This method returns a new instance of the MViewController subclass this MApplicationController
 	 * represents, initialised with the specified parameters.
 	 *
-	 * @param MArray $parameters An array containing the parameters with which to initialise the
+	 * @param MArray<object> $parameters An array containing the parameters with which to initialise the
 	 * new MViewController instance
 	 *
 	 * @return MViewController returns an instance of the MViewController this Application
 	 * controller represents with the specified parameters
 	 */
-	public function newViewControllerInstanceWithParameters(MArray $parameters) : MViewController {
+	public function newViewControllerInstanceWithParameters(MArray<object> $parameters) : MViewController {
 		$reflectionClass = MObject::reflectionClass($this->controllerClassName());
 		$reflectionConstructor = $reflectionClass->getMethod("__construct");
 		
@@ -425,11 +411,9 @@ class MApplicationController extends MApplicationNode {
 	/******************** MApplicationNode ********************/
 	
 	/**
-	 *
-	 *
 	 * @return MViewController
 	 */
-	public function viewControllerForPath(MArray $path) : MViewController {
+	public function viewControllerForPath(MArray<MString> $path) : ?MViewController {
 		$viewController = null;
 		$childViewController = null;
 	

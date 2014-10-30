@@ -33,46 +33,31 @@
  *
  * @license MIT
  */
-class MMutableDictionary extends MDictionary {
+class MMutableDictionary<Tk, Tv> extends MDictionary<Tk, Tv> {
 	
-	//
-	// ************************************************************
-	//
-	
-	public function __construct(?MDictionary $dictionary = null) {
-		parent::__construct();
-		
-		if ($dictionary !== null) {
-			$this->mergeDictionary($dictionary);
-		}
+	public function __construct(?KeyedTraversable<Tk, Tv> $kt = null) {
+		parent::__construct($kt);
 	}
 	
 	/******************** Methods ********************/
-	
-	public function removeObjectForKey(object $key) : void {
-		$index = $this->_keys->indexOfObject($key);
-		if ($index != MArray::ObjectNotFound) {
-			$this->_keys->removeObjectAtIndex($index);
-			$this->_values->removeObjectAtIndex($index);
-		}
+
+	public function setObjectForKey(Tk $key, Tv $object) : void {
+		$this->_map->set($key, $object);
+	}
+
+	public function removeObjectForKey(Tk $key) : void {
+		$this->_map->remove($key);
 	}
 	
-	public function setObjectForKey(object $key, object $object) : void {
-		$this->removeObjectForKey($key);
-		$this->_keys->addObject($key);
-		$this->_values->addObject($object);
-	}
-	
-	public function mergeDictionary(MDictionary $dictionary) : void {
-		foreach ($dictionary->allKeys()->toArray() as $key) {
+	public function mergeDictionary(MDictionary<Tk, Tv> $dictionary) : void {
+		foreach ($dictionary->allKeys()->toVector() as $key) {
 			$object = $dictionary->objectForKey($key);
 			$this->setObjectForKey($key, $object);
 		}
 	}
 	
 	public function removeAllObjects() : void {
-		$this->_keys->removeAllObjects();
-		$this->_values->removeAllObjects();
+		$this->_map->clear();
 	}
 	
 }

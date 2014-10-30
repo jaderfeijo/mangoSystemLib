@@ -35,10 +35,6 @@
  */
 class MViewController extends MObject {
 	
-	//
-	// ************************************************************
-	//
-	
 	protected MView $_view;
 	protected ?MApplicationController $_applicationController;
 	protected MHTTPResponseCode $_responseCode;
@@ -48,10 +44,10 @@ class MViewController extends MObject {
 	protected ?MView $_accessDeniedView;
 	protected ?MView $_invalidCredentialsView;
 	protected MString $_authenticatedUserName;
-	protected ?MMutableDictionary $_parameterValues;
-	protected ?MMutableDictionary $_fieldValues;
+	protected ?MMutableDictionary<MApplicationControllerParameter, MValue> $_parameterValues;
+	protected ?MMutableDictionary<MApplicationControllerField, MValue> $_fieldValues;
 	protected ?MViewController $_parentViewController;
-	protected MMutableArray $_childViewControllers;
+	protected MMutableArray<MViewController> $_childViewControllers;
 	
 	public function __construct(?MView $view = null) {
 		parent::__construct();
@@ -234,18 +230,18 @@ class MViewController extends MObject {
 		}
 	}
 	
-	public function valueForField(MApplicationControllerField $field) : ?MObject {
-		if (!$this->_fieldValues) {
+	public function valueForField(MApplicationControllerField $field) : ?MValue {
+		if ($this->_fieldValues === null) {
 			$this->_parseFieldValues();
 		}
-		if ($this->_fieldValues) {
+		if ($this->_fieldValues !== null) {
 			return $this->_fieldValues->objectForKey($field);
 		} else {
 			return null;
 		}
 	}
 	
-	public function valueForParameterNamed(MString $parameterName) : ?MObject {
+	public function valueForParameterNamed(MString $parameterName) : ?MValue {
 		if ($this->applicationController()) {
 			$parameter = $this->applicationController()->acceptedMethodForMethod(S(MHTTPRequest()->method()))->parameterWithName($parameterName);
 			if (!$parameter) {
@@ -257,10 +253,10 @@ class MViewController extends MObject {
 		}
 	}
 	
-	public function valueForFieldNamed(MString $fieldName) : ?MObject {
+	public function valueForFieldNamed(MString $fieldName) : ?MValue {
 		if ($this->applicationController()) {
 			$field = $this->applicationController()->acceptedMethodForMethod(S(MHTTPRequest()->method()))->fieldWithName($fieldName);
-			if (!$field) {
+			if ($field !== null) {
 				throw new MFieldUndefinedException($fieldName);
 			}
 			return $this->valueForField($field);

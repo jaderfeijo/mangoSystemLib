@@ -29,13 +29,11 @@
  */
 	
 /**
- * 
- *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
  */
-class MData extends MObject {
+class MData extends MValue {
 	
 	public static function parseBase64String(MString $base64String) : MData {
 		return new MData(base64_decode($base64String->stringValue()));
@@ -51,9 +49,9 @@ class MData extends MObject {
 	
 	protected string $_bytes;
 	
-	public function __construct(string $bytes) {
+	public function __construct(?string $bytes) {
 		parent::__construct();
-		$this->_bytes = $bytes;
+		$this->_bytes = ($bytes !== null : $bytes : "");
 	}
 	
 	/******************** Properties ********************/

@@ -28,21 +28,19 @@
  * SUCH DAMAGE.
  */
 
-enum MStringDelimiters : MString {
-	WordDelimiterCharacters : S(" .,\n\t");
-	LineDelimiterCharacters : S("\n");
-}
-
 /**
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
  */
-class MString extends MObject {
+class MString extends MValue {
 	
+	const MString WordDelimiterCharacters = S(" .,\n\t");
+	const MString LineDelimiterCharacters = S("\n");
+
 	/******************** Static Methods ********************/
 	
-	public static function stringWithFormat() : MString {
+	public static function stringWithFormat(...) : MString {
 		$args = func_get_args();
 		return new MString(call_user_func_array('sprintf', $args));
 	}
@@ -57,9 +55,9 @@ class MString extends MObject {
 	
 	protected string $_string;
 	
-	public function __construct(string $string = "") {
+	public function __construct(?string $string) {
 		parent::__construct();
-		$this->_string = $string;
+		$this->_string = ($string !== null ? $string : "");
 	}
 	
 	/******************** Methods ********************/
@@ -229,7 +227,7 @@ class MString extends MObject {
 		return $this;
 	}
 	
-	public function hash() : string {
+	public function hash() : int {
 		return hexdec(md5($this->stringValue()));
 	}
 	

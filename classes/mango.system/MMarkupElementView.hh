@@ -35,10 +35,6 @@
  */
 abstract class MMarkupElementView extends MView {
 	
-	//
-	// ************************************************************
-	//
-	
 	protected ?MString $_element;
 	protected ?MString $_text;
 	protected MMutableDictionary $_properties;

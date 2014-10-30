@@ -53,7 +53,7 @@ class MMutableString extends MString {
 		$this->_string .= $string->stringValue();
 	}
 	
-	public function appendFormat() : void {
+	public function appendFormat(...) : void {
 		$args = func_get_args();
 		$this->_string .= call_user_func_array('sprintf', $args);
 	}

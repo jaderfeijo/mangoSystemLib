@@ -33,35 +33,26 @@
  *
  * @license MIT
  */
-class MMutableSet extends MSet {
+class MMutableSet<T> extends MSet<T> {
 	
-	//
-	// ************************************************************
-	//
-	
-	public function __construct(?MSet $set = null) {
-		if ($set !== null) {
-			parent::__construct($set->_set);
-		} else {
-			parent::__construct();
-		}
+	public function __construct(?Traversable<T> $t = null) {
+		parent::__construct($t);
 	}
 	
 	/******************** Methods ********************/
 	
-	public function addObject(object $object) : bool {
-		if (!$this->objectExists($object)) {
-			$this->_set[] = $object;
+	public function addObject(T $object) : bool {
+		if (!$this->containsObject($object)) {
+			$this->_set->add($object);
 			return true;
 		} else {
 			return false;
 		}
 	}
 	
-	public function removeObject($object) : bool {
-		$index = $this->_indexOfObject($object);
-		if ($index != MSet::ObjectNotFound) {
-			$this->_set = array_splice($this->_set, $index, 1);
+	public function removeObject(T $object) : bool {
+		if ($this->containsObject($object)) {
+			$this->_set->remove($object);
 			return true;
 		} else {
 			return false;
@@ -69,9 +60,8 @@ class MMutableSet extends MSet {
 	}
 	
 	public function removeAllObjects() : void {
-		unset($this->_set);
-		$this->_set = array();
+		$this->_set->clear();
 	}
-	
+
 }
 

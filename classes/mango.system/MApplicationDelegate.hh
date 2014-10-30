@@ -60,7 +60,7 @@ interface MApplicationDelegate {
 	 * @return int This function should return a code which indicates
 	 * whether or not the execution was successful
 	 */
-	public function didFinishLaunchingFromCommandLineWithArguments(MArray $arguments) : void;
+	public function didFinishLaunchingFromCommandLineWithArguments(MArray<MString> $arguments) : int;
 
 	/**
 	 * Called once the application has just finished launching,
@@ -89,49 +89,8 @@ interface MApplicationDelegate {
 	public function didCreateViewController(MViewController $viewController) : void;
 	
 	/**
-	 * Called when an exception occurs which hasn't been caught by any parts
-	 * of your application
+	 * @todo update method description
 	 *
-	 * This method offers you the opportunity to handle the exception and
-	 * recover from it if possible
-	 *
-	 * The return value represents whether you have handled the exception
-	 * or not. If you return false the system will log the exception to
-	 * the PHP error console and will return a '500 Internal Server Error'
-	 * to the client
-	 *
-	 * @param Exception $exception The uncaught exception to be handled
-	 *
-	 * @return bool Returns true if the exception has been handled, false otherwise
-	 */
-	public function didRecoverFromUncaughtException(Exception $exception) : void;
-	
-	/**
-	 * Called when an error occurs which hasn't been handled by any parts
-	 * of your application
-	 *
-	 * This method offers you the opportunity to handle the error and
-	 * recover from it if possible
-	 *
-	 * The return value represents whether you have handled the error
-	 * or not. If you return false the system will log the error to
-	 * the PHP error console and will return a '500 Internal Server Error'
-	 * to the client
-	 *
-	 * @param int $level The PHP error level
-	 * @param string $message The PHP error message
-	 * @param string $file The PHP file where the error occured
-	 * @param int $line The line number where the error occured
-	 * @param array $context An array that points to the active symbol
-	 * table at the point the error occured
-	 *
-	 * @see http://www.php.net/manual/en/function.set-error-handler.php
-	 *
-	 * @return bool Returns true if the error has been handled, false otherwise
-	 */
-	public function didRecoverFromError(int $level, string $message, string $file, int $line, array $context) : void;
-	
-	/**
 	 * Called just before the application is about to return it's results to the client
 	 * (or return code when running from the CLI) and be terminated.
 	 *
@@ -142,7 +101,17 @@ interface MApplicationDelegate {
 	 *
 	 * @return void
 	 */
-	public function willTerminateWithResponse(?MHTTPResonse $response, int $returnCode) : void;
+	public function willSendResponse(MHTTPResponse $response) : bool;
+
+	/**
+	 * @todo
+	 */
+	public function didSendResponse(MHTTPResponse $response) : void;
+
+	/**
+	 * @todo
+	 */
+	public function willTerminate() : void;
 	
 }
 

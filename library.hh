@@ -29,23 +29,16 @@
  */
  
 /**
- * This file initializes the Mango Framework environment and contains the
- * basic mango functions you need to perform basic operations in Mango
- *
- * Including this file into your top-level Mango Framework script is required
- * in order to use Mango Framework.
- *
- * This is usually done inside your index.php file by using the require() function
- *
- * @example require('system/MangoFramework.php');
+ * This contains various utility Mango System functions you need
+ * in order to perform basic operations in Mango.
  *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
- *
  */
 	
-require_once('errors.php');
+require_once('errors.hh');
+require_once('types.hh');
 
 /******************** Boxing & Unboxing Strings ********************/
 
@@ -67,12 +60,8 @@ require_once('errors.php');
  *
  * @return MString Returns the boxed string
  */
-function S(?string $string = null) : MString {
-	if ($string === null) {
-		return null;
-	} else {
-		return new MString($string);
-	}
+function S(string $string) : MString {
+	return new MString($string);
 }
 
 /**
@@ -95,7 +84,7 @@ function S(?string $string = null) : MString {
  */
 function Sf(...) : MString {
 	$args = func_get_args();
-	return MString::_stringWithFormat($args);
+	return MString::stringWithFormat($args);
 }
 	
 /**
@@ -144,12 +133,16 @@ function str(MString $string) : string {
  *
  * @return MArray Returns the boxed array
  */
-function A(...) : MArray {
+function A<T>(...) : MArray<T> {
 	$args = func_get_args();
 	if (count($args) == 1 && is_array($args[0])) {
-		return new MArray($args[0]);
+		return MArray::withArray($args[0]);
+	} else if (count($args) == 1 && $args[0] instanceof Traversable) {
+		return MArray::withObjects($args[0]);
+	} else if (count($args) == 1 && $args[0] instanceof MArray) {
+		return MArray::withObjectsFromArray($args[0]);
 	} else {
-		return new MArray($args);
+		return MArray::withArray($args);
 	}
 }
 	
@@ -349,30 +342,6 @@ function MVarExport(MObject $object) : void {
 	MLog(var_export($object, true));
 }
 	
-/**
- * Kills the current application and returns $response to the client
- *
- * This function responds to the client using an instance of `MHTTPResponse`
- * specified by `$response` and kills the execution of the application
- * imediately after.
- *
- * @see MHTTPResponse
- *
- * @param MHTTPResponse $response The HTTP response to return to the client
- * before killing the application
- *
- * @return void
- */
-function MDie(?MHTTPResponse $response = null, int $returnCode = 0) : void {
-	MAppDelegate()->willTerminateWithResponse($response, $returnCode);
-	
-	if ($response !== null) {
-		MSendResponse($response);
-	}
-	
-	die($returnCode);
-}
-
 /******************** Getting the Application Object & Delegate ********************/
 
 /**
@@ -420,11 +389,15 @@ function MHTTPRequest() : MHTTPRequest {
 }
 
 /**
+ * @todo update
+ *
  * Sends a `MHTTPResponse` object to the client
  *
  * This funciton is used to send a HTTP response back to the client,
  * the response is represented by an instance of the `MHTTPResponse`
  * class
+ *
+ * @todo explain MResponseAlreadySentException
  *
  * @see MHTTPResponse
  *
@@ -432,107 +405,191 @@ function MHTTPRequest() : MHTTPRequest {
  *
  * @return void
  */
-function MSendResponse(MHTTPResponse $response) : void {
-	$body = $response->body();
-	
-	header(sprintf("HTTP/1.1 %d %s", $response->code(), $response->responseString()));
-	if ($response->headers()->count() > 0) {
-		foreach ($response->headers()->allKeys()->toArray() as $header) {
-			header(sprintf("%s: %s", $header, $response->headers()->objectForKey($header)));
+function MSendResponse(MHTTPResponse $response) : bool {
+	if (MHTTPResponse::responseSent()) {
+		throw new MResponseAlreadySentException();
+	}
+
+	if (MAppDelegate()->willSendResponse($response) {
+		header(sprintf("HTTP/1.1 %d %s", $response->code(), $response->responseString()));
+		if ($response->headers()->count() > 0) {
+			foreach ($response->headers()->allKeys()->toArray() as $header) {
+				header(sprintf("%s: %s", $header, $response->headers()->objectForKey($header)));
+			}
 		}
-	}
-	if ($body) {
-		echo $body;
-	}
-}
+		
+		MExec($response->body(), $body) {
+			echo $body;
+		});
 
-/******************** Internal Stuff ********************/
-
-/**
- * @internal
- *
- * return string
- */
-function addLeadingSpaces(string $string, int $totalLength) : string {
-	return str_repeat(" ", $totalLength - strlen($string)) . $string;
-}
-
-/**
- * @internal
- *
- * Returns a boolean indicating whether or not this application
- * was invoked from the command line.
- *
- * @return bool true if this application is running from the command
- * line, false otherwise.
- */
-function isRunningFromCommandLine() : bool {
-	if (PHP_SAPI == 'cli') {
 		return true;
+	} else {
+		return false;
 	}
-	return false;
+}
+
+/******************** Miscelaneous ********************/
+
+/**
+ * @todo update
+ *
+ * Main Mango Function
+ *
+ * This function shoud be called from within an application's `index`
+ * file and is responsible for initialising the MApplication instance
+ * and kick starting Mango Framework for the given application.
+ *
+ * @param array $argv An array containing CLI arguments passed to the
+ * application
+ * @param ?MString $delegateClass A String containing the name of the
+ * Application Delegate class to use.
+ *
+ * @see MApplicationDelegate
+ *
+ * @return int @todo
+ */
+function MMain(array $argv) : int {
+	try {
+		$arguments = new MMutableArray();
+		foreach ($argv as $arg) {
+			$arguments->addObject(S($arg));
+		}
+
+		$application = null;
+	
+		if (MFile::fileExists("resources/manifest.xml")) {
+			$xmlManifest = simplexml_load_file("resources/manifest.xml");
+			MExec($xmlManifest['delegate'], $delegateClass ==> {
+				try {
+					$delegate = MObject::newInstanceOfClass($delegateClass);
+					$defaultNamespace = MApplicationNamespace::parseFromXMLElement($xmlManifest, S("application"));
+					$application = new MApplication($delegate, $defaultNamespace, $arguments);
+					
+					MExec($xmlManifest['errorClass'], $errorViewControllerClass ==> {
+						$application->setErrorViewControllerClass(S($errorViewControllerClass));
+					});
+				} catch (Exception $e) {
+					throw new MParseErrorException(S("resources/manifest.xml"), null, null, $e);
+				}
+			}, () ==> {
+				throw new MParseErrorException(S("resources/manifest.xml"), null, S("No application delegate class defined"));
+			});
+		} else {
+			throw new MFileNotFoundException(S('resources/manifest.xml'));
+		}
+	
+		if ($application !== null) {
+			return $application->run();
+		} else {
+			throw new MException(S("Failed to initialise application!"));	
+		}
+	} catch (Exception $e) {
+		logException($e);
+
+		$viewController = new MErrorViewController(MHTTPResponseCode::InternalServerError, I(MHTTPResponseCode::InternalServerError), S("Internal Server Error"), S("Sorry but the page you are looking for could not be loaded due to an internal server error"));
+		$response = new MHTTPViewControllerResponse($viewController);
+		MSendResponse($response);
+
+		return 1;
+	}
 }
 
 /**
- * @internal
+ * Initializes an object in case it is null using the function passed in
+ * the `$initializer` parameter and returns the initialized object.
  *
- * Returns a boolean indicating whether or not this application
- * is running in simulated request mode.
+ * This function is useful when you need an object to be initialized
+ * before it is returned. It checks if the object is already initialized
+ * and returns it, and if it isn't it calls the initializer function
+ * and returns it's results.
+ * 
+ * @param ?T $object The object to be initialized
+ * @param MInitializerCallback<T> $callback The callback to be used to initialize
+ * the object if necessary.
  *
- * @return bool true if this application is running in simulated
- * request mode.
+ * @return The initialized object.
  */
-function isRunningInSimulatedRequestMode() : bool {
-	global $argv;
-	if (count($argv) > 0) {
-		if ($argv[1] == "--simulate-request") {
-			return true;
-		}
+function MInit<T>(?T $object, MInitializerCallback<T> $callback) : T {
+	if ($object === null) {
+		return $initializer();
+	} else {
+		return $object;
 	}
-	return false;
 }
 
 /**
- * @internal
+ * Initializes an object with another object if it's not null, and without it if
+ * the object is null.
  *
- * Returns the file name containing the simulated request
- * parameters. This file name is specified in the command
- * line when calling the application in simulated mode.
+ * This method is a convenience method which allows you to initialize an object
+ * conditionally based on whether or not the passed object is null.
  *
- * @see isRunningInSimulatedRequestMode()
- * @see "--simulate-request"
+ * @param ?Tw $object The object to pass to the `$withCallback`.
+ * @param MInitWithCallback<Tw, To> $withCallback The callback that is called the
+ * `$object` is not null.
+ * @param MInitWithoutCallback<To> $withoutCallback The callback that is called
+ * if `$object` is null.
  *
- * @return string The file name containing the simulated request
- * or null if not running in simulated request mode or if no
- * file name is specified.
+ * @return To The object resulting of the initialization.
  */
-function simulatedRequestFileName() : string {
-	global $argv;
-	if (isRunningFromCommandLine() && isRunningInSimulatedRequestMode()) {
-		if (isset($argv[2])) {
-			return $argv[2];
-		}
+function MInitWith<Tw, To>(?Tw $object, MInitWithCallback<Tw, To> $withCallback, MInitWithoutCallback<To> $withoutCallback) : To {
+	if ($object !== null) {
+		return $withCallback($object);
+	} else {
+		return $withoutCallback();
 	}
-	return null;
-}
+}	
 
 /**
- * @internal
+ * Ensures that an object is not null before executing a method.
  *
- * Returns the name of the request that should be used
+ * This is a utility function to safely execute methods on objects that can
+ * be null.
  *
- * @see isRunningInSimulaterRequestMode()
- * @see "--simulate-request"
+ * This function checks if the value of `$object` is different than `null`
+ * and if it isn't, it calls the function specified in `$callback` with
+ * the object as an argument.
  *
- * @return string The name of the request that should be used
+ * If the value of `$object` is null, `$callback` is never called.
+ *
+ * Using this function has the same effect as writing:
+ *
+ *  $object = someNullableMethod();
+ *  if ($object !== null) {
+ * 	   $object->method();
+ *  } 
+ *
+ * In this case, you woud write:
+ *
+ *  MExec(someNullableMethod(), $object ==> {
+ *  	$object->method();
+ *  }, null);
+ *
+ * In cases where you need to perform some action when the object is null simply
+ * pass in a `MNullCallback` as the third argument
+ *
+ *  MExec(someNullableMethod(), $object ==> {
+ *     $object->method();
+ *  }, () == > {
+ *     throw new MException();
+ *  });
+ *
+ * @param ?T $object An object to be passed to the callback if `$object` is not
+ * null.
+ * @param MExecuteCallback<T> $callback The callback method to call in case `$object`
+ * is not null.
+ * @param MNullCallback $callback The callback method to call in case `$object` is
+ * null.
+ *
+ * @return void
  */
-function simulatedRequestName() : string {
-	global $argv;
-	if (isRunningFromCommandLine() && isRunningInSimulatedRequestMode()) {
-		if (isset($argv[3])) {
-			return $argv[3];
+function MExec<T>(?T $object, MExecuteCallback<T> $callback, ?MNullCallback $nullCallback = null) : void {
+	if ($object !== null) {
+		$callback($object);
+	} else {
+		if ($nullCallback !== null) {
+			$nullCallback($object);
 		}
 	}
-	return null;
 }
 

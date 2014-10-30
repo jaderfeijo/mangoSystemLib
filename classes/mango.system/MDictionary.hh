@@ -1,4 +1,4 @@
-<?hh // strict
+<?hh
 
 /*
  * Copyright (c) 2011 Movinpixel Ltd. All rights reserved.
@@ -29,18 +29,16 @@
  */
 
 /**
- * 
- *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
  */
-class MDictionary extends MObject {
+class MDictionary<Tk, Tv> extends MValue {
 	
-	public static function parseString(MString $dictString) MDictionary {
+	public static function parseString(MString $dictString) : MDictionary<MString, MString> {
 		$arr = $dictString->componentsSeparatedByString(S("|"));
-		$dict = new MMutableDictionary();
-		foreach ($arr->toArray() as $dictKeyPair) {
+		$dict = new MMutableDictionary(null);
+		foreach ($arr->toVector() as $dictKeyPair) {
 			$dictKeyPairArr = $dictKeyPair->componentsSeparatedByString(S(":"));
 			$key = $dictKeyPairArr->objectAtIndex(0)->urlDecodedString();
 			$value = $dictKeyPairArr->objectAtIndex(1)->urlDecodedString();
@@ -53,107 +51,107 @@ class MDictionary extends MObject {
 	// ************************************************************
 	//
 	
-	protected MMutableArray $_keys;
-	protected MMutableArray $_values;
+	protected Map<Tk, Tv> $_map;
 	
-	public function __construct(array $dictionary = array()) {
+	public function __construct(?KeyedTraversable<Tk, Tv> $kt = null) {
 		parent::__construct();
-		
-		$this->_keys = new MMutableArray(A(array_keys($dictionary)));
-		$this->_values = new MMutableArray(A(array_values($dictionary)));
-		
-		$args = func_get_args();
-		if (N(count($args))->isEven()) {
-			for ($i = 0; $i < count($args); $i++) {
-				$key = $args[$i];
-				$object = $args[++$i];
-				$this->_keys->addObject($key);
-				$this->_values->addObject($object);
+
+		$this->_map = new Map(null);
+
+		if ($kt !== null) {
+			foreach ($kt as $k => $v) {
+				$this->_map->set($k, $v);
 			}
-		} else {
-			throw new MException(S("Uneven number of keys and objects specified"));
 		}
 	}
 	
 	/******************** Properties ********************/
 	
-	public function allKeys() : MArray {
-		return (MArray)$this->_keys;
-	}
-	
-	public function allObjects() : MArray {
-		return (MArray)$this->_values;
-	}
-	
-	public function allValues() : MArray {
-		return $this->allObjects();
-	}
-	
-	public function hasObjectForKey(object $key) : bool {
-		return $this->_keys->objectExists($key);
-	}
-	
-	public function objectForKey(object $key) : ?object {
-		$index = $this->_keys->indexOfObject($key);
-		if ($index != MArray::ObjectNotFound) {
-			return $this->_values->objectAtIndex($index);
-		} else {
-			return null;
-		}
-	}
-	
 	public function count() : int {
-		return $this->_keys->count();
+		return $this->_map->count();
+	}
+
+	public function keys() : MArray<Tk> {
+		return MArray::withObjectsFromVector($this->_map->keys());
 	}
 	
-	public function toArray() : array {
-		$array = array();
-		
-		foreach ($this->allKeys()->toArray() as $key) {
-			$object = $this->objectForKey($key);
-			
-			$k = (string)$key;
-			$v = null;
-			
-			if ($object instanceof MDictionary) {
-				$v = $object->toArray();
-			} else if ($object instanceof MArray) {
-				$v = $object->toArray();
-			} else if ($object instanceof MNumber) {
-				$v = $object->value();
-			} else {
-				$v = (string)$object;
-			}
-			
-			$array[$k] = $v;
+	public function objects() : MArray<Tv> {
+		return MArray::withObjectsFromVector($this->_map->values());
+	}
+	
+	public function keyedTraversable() : KeyedTraversable<Tk, Tv> {
+		return $this->toMap();
+	}
+
+	/******************** Methods ********************/
+
+	public function hasObjectForKey(Tk $key) : bool {
+		return $this->_map->contains($key);
+	}
+	
+	public function objectForKey(Tk $key) : Tv {
+		$object = $this->_map->get($key);
+		if ($object === null) {
+			throw new MUndefinedKeyException($key);
 		}
-		
-		return $array;
+		return $object;
 	}
 	
+	public function toMap() : ConstMap<Tk, Tv> {
+		return $this->_map;
+	}
+
+	public function toArray() : array {
+		return $this->toMap()->toArray();
+	}
+
 	public function toJSON() : MString {
 		return S(json_encode($this->toArray()));
 	}
-	
+
 	/******************** MObject Methods ********************/
 	
+	public function equals(MMangoObject $object) : bool {
+		if ($object instanceof MDictionary) {
+			if ($this->count() == $object->count()) {
+				foreach ($this->traversable() as $k => $o) {
+					if ($object->objectForKey($k) != $o) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+
 	public function compare(MMangoObject $object) : MComparisonResult {
-		return N($this->count())->compare(N($object->count()));
+		if ($object instanceof MDictionary) {
+			if ($this->count() < $object->count()) {
+				return MComparisonResult::Ascending;
+			} else if ($this->count() > $object->count()) {
+				return MComparisonResult::Descending;
+			} else {
+				return MComparisonResult::Same;
+			}
+		} else {
+			throw new MException(S("Invalid object type"));
+		}
 	}
 	
 	public function toString() : MString {
 		$string = new MMutableString();
-		foreach ($this->allKeys()->toArray() as $key) {
+		$keys = $this->allKeys();
+		foreach ($keys->toVector() as $key) {
 			$string->appendFormat("%s:%s", urlencode((string)$key), urlencode((string)$this->objectForKey($key)));
-			if (!$this->allKeys()->isLastObject($key)) {
+			if (!$keys->isLastObject($key)) {
 				$string->appendString(S("|"));
 			}
 		}
-		return (MString)$string;
-	}
-	
-	public function hash() : string {
-		return hexdec(md5($this->toString()));
+		return $string;
 	}
 	
 }

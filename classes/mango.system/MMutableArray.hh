@@ -33,82 +33,50 @@
  *
  * @license MIT
  */
-class MMutableArray extends MArray {
+class MMutableArray<T> extends MArray<T> {
 	
-	//
-	// ************************************************************
-	//
-	
-	public function __construct(?MArray $array = null) {
-		if ($array !== null) {
-			parent::__construct($array->_array);
-		} else {
-			parent::__construct();
-		}
+	public function __construct(?Traversable<T> $t = null) {
+		parent::__construct($t);
 	}
 	
 	/******************** Methods ********************/
 	
-	public function addObject(object $object) : void {
-		$this->_array[] = $object;
+	public function addObject(T $object) : void {
+		$this->_vector->add($object);
 	}
 	
-	public function addObjects(array $objects) : void {
-		foreach ($objects as $object) {
+	public function addObjects(MArray<T> $objects) : void {
+		foreach ($objects->traversable() as $object) {
 			$this->addObject($object);
 		}
 	}
 
-	public function addObjectsFromArray(MArray $objects) : void {
-		foreach ($objects->toArray() as $object) {
-			$this->addObject($object);
-		}
-	}
-	
-	public function removeObject($object) : bool {
-		for ($i = 0; $i < $this->count(); $i++) {
-			if ($this->_array[$i] == $object) {
-				$this->removeObjectAtIndex($i);
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	public function removeObjectAtIndex(int $index) : void {
-		if ($index >= $this->lowerBound() && $index <= $this->upperBound()) {
-			array_splice($this->_array, $index, 1);
+	public function removeObject(T $object) : bool {
+		$index = $this->indexOfObject($object);
+		if ($index != MArray::ObjectNotFound) {
+			$this->removeObjectAtIndex($index);
+			return true;
 		} else {
+			return false;
+		}
+	}
+
+	public function removeObjects(MArray<T> $objects) : void {
+		foreach ($objects->traversable() as $object) {
+			$this->removeObject($object);
+		}
+	}
+
+	public function removeObjectAtIndex(int $index) : void {
+		if ($index < $this->lowerBound() || $index > $this->upperBound()) {
 			throw new MIndexOutOfBoundsException($index, $this->lowerBound(), $this->upperBound());
 		}
+		$this->_vector->removeKey($index);
 	}
 	
 	public function removeAllObjects() : void {
-		unset($this->_array);
-		$this->_array = array();
+		$this->_vector->clear();
 	}
-	
-	public function appendArray(MArray $array) : void {
-		$this->_array = array_merge($this->_array, $array->_array);
-	}
-	
-	public function subtractArray(MArray $array) : void {
-		foreach ($array->toArray() as $search) {
-			foreach ($this->_array as $key => $value) {
-				if ($search instanceof MObject) {
-					if ($search->equals($value)) {
-						$this->removeObjectAtIndex($key);
-						break;
-					}
-				} else {
-					if ($search == $value) {
-						$this->removeObjectAtIndex($key);
-						break;
-					}
-				}
-			}
-		}
-	}
-	
+
 }
 

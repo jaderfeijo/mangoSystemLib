@@ -28,12 +28,6 @@
  * SUCH DAMAGE.
  */
 
-enum MComparisonResult : int {
-	Descending - -1;
-	Same = 0;
-	Ascending = 1;
-}
-
 /**
  * Low level interface to which all Mango Objects must conform
  *
@@ -81,20 +75,6 @@ interface MMangoObject {
 	 * @return MString The objects' class name
 	 */
 	public function className() : MString;
-	
-	/**
-	 * Returns the package name of the current object
-	 *
-	 * @return MString The objects' package name
-	 */
-	public function packageName() : MString;
-	
-	/**
-	 * Returns the fully qualified class name of the current object
-	 *
-	 * @return MString The objects' fully qualified class name
-	 */
-	public function fullClassName() : MString;
 	
 	/**
 	 * Returns a boolean indicating whether this object is of the

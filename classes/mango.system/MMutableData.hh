@@ -43,7 +43,7 @@ class MMutableData extends MData {
 	// ************************************************************
 	//
 	
-	public function __construct(string $bytes) {
+	public function __construct(?string $bytes) {
 		parent::__construct($bytes);
 	}
 	

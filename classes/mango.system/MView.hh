@@ -35,19 +35,10 @@
  */
 class MView extends MObject {
 	
-	//
-	// ************************************************************
-	//
-	
 	protected MMutableArray $_subviews;
 	protected ?MView $_superview;
 	protected MString $_contentType;
 	
-	/**
-	 * 
-	 *
-	 * @return MView
-	 */
 	public function __construct() {
 		parent::__construct();
 		$this->_subviews = new MMutableArray();

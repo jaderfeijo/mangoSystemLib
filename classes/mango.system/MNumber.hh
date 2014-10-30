@@ -33,6 +33,6 @@
  *
  * @license MIT
  */
-abstract class MNumber extends MObject {
+abstract class MNumber extends MValue {
 
 }

@@ -41,7 +41,7 @@ class MErrorViewController extends MViewController {
 	
 	protected MHTMLErrorDocumentView $_errorView;
 	
-	public function __construct(int $responseCode, ?MNumber $errorCode = null, ?MString $errorName = null, ?MString $errorDescription = null) {
+	public function __construct(int $responseCode, MInteger $errorCode, MString $errorName, MString $errorDescription) {
 		parent::__construct();
 		
 		$this->setResponseCode($responseCode);

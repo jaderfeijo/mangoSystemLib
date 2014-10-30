@@ -1,4 +1,4 @@
-<?hh // strict
+<?hh
 
 /*
  * Copyright (c) 2011 Movinpixel Ltd. All rights reserved.
@@ -28,62 +28,88 @@
  * SUCH DAMAGE.
  */
 
-enum MArrayOrder : int {
-	Ascending = 0;
-	Descending = 1;
-}
-
 /**
- * 
- *
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
  */
-class MArray extends MObject {
+class MArray<T> extends MValue {
 	
 	const int ObjectNotFound = -1;
-	
+
+	public static function withArray<Tv>(array $objects) : MArray<Tv> {
+		$array = new MMutableArray();
+		foreach ($objects as $object) {
+			$array->addObject($object);
+		}
+		return $array;
+	}
+
+	public static function withObjectsFromArray<Tv>(MArray<Tv> $objects) : MArray<Tv> {
+		return MArray::withObjects($objects->traversable());
+	}
+
+	public static function withObjects<Tv>(Traversable<Tv> $objects) : MArray<Tv> {
+		$array = new MMutableArray();
+		foreach ($objects as $object) {
+			$array->addObject($object);
+		}
+		return $array;
+	}
+
 	//
 	// ************************************************************
 	//
 	
-	protected array $_array;
+	protected Vector<T> $_vector;
 	
-	public function __construct(array $array = array()) {
+	public function __construct(?Traversable<T> $t = null) {
 		parent::__construct();
-		
-		$this->_array = $array;
+
+		$this->_vector = new Vector($t);
+
+		if ($t !== null) {
+			foreach ($t as $o) {
+				$this->_vector->add($o);
+			}
+		}
 	}
 	
 	/******************** Properties ********************/
 	
+	public function count() : int {
+		return $this->_vector->count();
+	}
+
 	public function lowerBound() : int {
 		return 0;
 	}
-	
+
 	public function upperBound() : int {
 		return $this->count() - 1;
 	}
-	
-	public function count() : int {
-		return count($this->_array);
+
+	public function isEmpty() : bool {
+		return ($this->count() <= 0);
 	}
 	
+	public function traversable() : Traversable<T> {
+		return $this->toVector();
+	}
+
 	/******************** Methods ********************/
 	
-	public function objectAtIndex(int $index) : object {
-		if ($index >= $this->lowerBound() && $index <= $this->upperBound()) {
-			return $this->_array[$index];
-		} else {
+	public function objectAtIndex(int $index) : T {
+		if ($index < $this->lowerBound() || $index > $this->upperBound()) {
 			throw new MIndexOutOfBoundsException($index, $this->lowerBound(), $this->upperBound());
 		}
+		return $this->_vector->at($index);
 	}
 	
-	public function indexOfObject(object $object) : int {
+	public function indexOfObject(T $object) : int {
 		for ($i = 0; $i < $this->count(); $i++) {
-			$current = $this->_array[$i];
-			if ($object instanceof MObject && $current instanceof MObject) {
+			$current = $this->objectAtIndex($i);
+			if ($object instanceof MMangoObject && $current instanceof MMangoObject) {
 				if ($object->equals($current)) {
 					return $i;
 				}
@@ -93,87 +119,109 @@ class MArray extends MObject {
 				}
 			}
 		}
-		return MArray::OBJECT_NOT_FOUND;
+		return MArray::ObjectNotFound;
 	}
-	
-	public function containsObject(object $object) : bool {
+
+	public function containsObject(T $object) : bool {
 		return ($this->indexOfObject($object) != MArray::ObjectNotFound);
 	}
 	
-	public function lastObject() : ?object {
-		if ($this->count() > 0) {
-			return $this->objectAtIndex($this->upperBound());
-		} else {
-			return null;
-		}
+	public function lastObject() : T {
+		return $this->objectAtIndex($this->upperBound());
 	}
 	
-	public function isLastObject(object $object) : void {
-		return $this->indexOfObject($object) == $this->upperBound();
+	public function isLastObject(T $object) : bool {
+		return ($this->indexOfObject($object) == $this->upperBound());
 	}
 	
 	public function componentsJoinedByString(MString $separator) : MString {
-		return new MString(implode($separator->stringValue(), $this->_array));
+		return new MString(implode($separator->stringValue(), $this->toArray()));
 	}
 	
-	public function subarrayWithRange(MRange $range) : MArray {
-		return new MArray(array_slice($this->_array, $range->location(), $range->length()));
+	public function subarrayWithRange(MRange $range) : MArray<T> {
+		return MArray::withObjectsFromArray(array_slice($this->toArray(), $range->location(), $range->length()));
 	}
 	
-	public function subarrayFromIndex(int $index) : MArray {
+	public function subarrayFromIndex(int $index) : MArray<T> {
 		return $this->subarrayWithRange(MRangeMake($index, $this->upperBound()));
 	}
 	
-	public function subarrayToIndex(int $index) : MArray {
+	public function subarrayToIndex(int $index) : MArray<T> {
 		return $this->subarrayWithRange(MRangeMake(0, $index));
 	}
 	
-	public function sortedArray(MArrayOrder $order = MArrayOrder::Ascending, $sortFlags = SORT_REGULAR) : MArray {
-		$sortedArray = $this->_array;
+	public function sortedArray(MArrayOrder $order = MArrayOrder::Ascending, int $sortFlags = SORT_REGULAR) : MArray<T> {
+		$sortedArray = $this->toArray();
 		if ($order == MArrayOrder::Ascending) {
 			sort($sortedArray, $sortFlags);
 		} else {
 			rsort($sortedArray, $sortFlags);
 		}
-		return new MArray($sortedArray);
+		return MArray::withObjectsFromArray($sortedArray);
 	}
 	
-	public function sortedArrayUsingMethod(callback $method, MArrayOrder $order = MArrayOrder::Ascending) : MArray {
-		$array = $this->toArray();
-		usort($array, function ($a, $b) {
-			$result = $a->{$method}($b);
-			if (MArray::ORDER_DESCENDING) {
-				if ($result == MComparisonResult::Ascending) {
-					$result = MComparisonResult::Descending;
-				} else if ($result == MComparisonResult::Descending) {
-					$result = MComparisonResult::Ascending;
-				}
-			}
-			return $result;
-		});
-		return new MArray($array);
-	}
-	
-	public function arrayByAppendingArray(MArray $array) : MArray {
-		return A(array_merge($this->_array, $array->_array));
-	}
-	
-	public function toArray() : array {
-		return $this->_array;
+	public function arrayByAppendingArray(MArray<T> $array) : MArray<T> {
+		$newArray = new MMutableArray();
+		$newArray->addObjects($this);
+		$newArray->addObjects($array);
+		return $newArray;
 	}
 	
 	public function toJSON() : MString {
-		return S(json_encode($this->_array));
+		return S(json_encode($this->toArray()));
 	}
 	
+	public function toArray() : array {
+		return $this->toVector()->toArray();
+	}
+
+	public function toVector() : ConstVector<T> {
+		return $this->_vector;
+	}
+
 	/******************** MObject Methods ********************/
 	
+	public function equals(MMangoObject $object) : bool {
+		if ($object instanceof MArray) {
+			if ($this->count() == $object->count()) {
+				for ($i = 0; $i < $this->count(); $i++) {
+					$obj1 = $this->objectAtIndex($i);
+					$obj2 = $this->objectAtIndex($i);
+					if ($obj1 instanceof MMangoObject && $obj2 instanceof MMangoObject) {
+						if (!$obj1->equals($obj2)) {
+							return false;
+						}
+					} else {
+						if ($obj1 !== $obj2) {
+							return false;
+						}
+					}
+				}
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+
 	public function compare(MMangoObject $object) : MComparisonResult {
-		return N($this->count())->compare(N($object->count()));
+		if ($object instanceof MArray) {
+			if ($this->count() < $object->count()) {
+				return MComparisonResult::Ascending;
+			} else if ($this->count() > $object->count()) {
+				return MComparisonResult::Descending;
+			} else {
+				return MComparisonResult::Same;
+			}
+		} else {
+			return MComparisonResult::Descending;
+		}
 	}
 	
 	public function toString() : MString {
-		return MString::stringWithFormat("MArray[%d]:\n%s", $this->count(), var_export($this->_array, true));
+		return Sf("MArray[%d]:\n%s", $this->count(), var_export($this->_vector, true));
 	}
 	
 }

@@ -28,22 +28,12 @@
  * SUCH DAMAGE.
  */
 
-enum MDateFormat : int {
-	Short = 0;
-	Full = 1;
-}
-
-enum MHourFormat : int {
-	TwentyFourHour : 0;
-	TwelveHour : 1;
-}
-
 /**
  * @author Jader Feijo <jader@movinpixel.com>
  *
  * @license MIT
  */
-class MDate extends MObject {
+class MDate extends MValue {
 	
 	//
 	// ************************************************************
