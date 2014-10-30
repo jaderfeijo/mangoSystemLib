@@ -135,7 +135,7 @@ class MApplication extends MObject {
 		$writer = new MStreamWriter($fileStream);
 		$writer->writeLine(S("# Mango URL Routing Code"));
 		$writer->writeLine(S("RewriteEngine On"));
-		$writer->writeLine(S("RewriteRule . index.php"));
+		$writer->writeLine(S("RewriteRule . index.hh));
 		$writer->close();
 		
 		MLog("[EnableRouting]: File created");
